@@ -1,0 +1,114 @@
+---
+controller_components:
+  - credential_types
+  - credentials
+  - execution_environments
+  - projects
+  - inventories
+  - inventory_sources
+  - job_templates
+
+aap_cred: 'AAP API Cred'
+ssh_cred: 'SSH Cred'
+vcenter_cred: 'vCenter Cred'
+quay_cred: 'Quay'
+ad_domain_cred: 'Active Directory Cred'
+
+vcenter_ee: vCenter EE
+rhel_ee: RHEL EE
+aap_ee: AAP EE
+windows_ee: Windows EE
+
+this_demo_inventory: Disconnected OCP
+this_demo_project: Disconnected OCP
+this_demo_project_repo: https://github.com/brianaddicks/ocp-disconnected-vsphere
+
+controller_credentials:
+  - name: '{{ aap_cred }}'
+    description: '{{ aap_cred }}'
+    organization: Default
+    credential_type: Red Hat Ansible Automation Platform
+    inputs:
+      host: "{{ lookup('ansible.builtin.env', 'CONTROLLER_HOST') }}"
+      password: "{{ lookup('ansible.builtin.env', 'CONTROLLER_PASSWORD') }}"
+      username: "{{ lookup('ansible.builtin.env', 'CONTROLLER_USERNAME') }}"
+      verify_ssl: "{{ lookup('ansible.builtin.env', 'CONTROLLER_VALIDATE_CERTS') | ansible.builtin.bool }}"
+  - name: '{{ vcenter_cred }}'
+    description: '{{ vcenter_cred }}'
+    organization: Default
+    credential_type: VMware vCenter
+    inputs:
+      host: "{{ lookup('ansible.builtin.env', 'VMWARE_HOST') }}"
+      password: "{{ lookup('ansible.builtin.env', 'VMWARE_PASSWORD') }}"
+      username: "{{ lookup('ansible.builtin.env', 'VMWARE_USER') }}"
+  - name: '{{ quay_cred }}'
+    description: '{{ quay_cred }}'
+    organization: Default
+    credential_type: Container Registry
+    inputs:
+      host: "{{ lookup('ansible.builtin.env', 'QUAY_HOST') }}"
+      password: "{{ lookup('ansible.builtin.env', 'QUAY_PASSWORD') }}"
+      username: "{{ lookup('ansible.builtin.env', 'QUAY_USERNAME') }}"
+      verify_ssl: true
+  - name: '{{ ad_domain_cred }}'
+    description: '{{ ad_domain_cred }}'
+    organization: Default
+    credential_type: Machine
+    inputs:
+      password: "{{ lookup('ansible.builtin.env', 'ANSIBLE_PSRP_PASSWORD') }}"
+      username: "{{ lookup('ansible.builtin.env', 'ANSIBLE_PSRP_USER') }}"
+      become_method: runas
+
+controller_projects:
+  - name: '{{ this_demo_project }}'
+    organization: Default
+    scm_branch: main
+    scm_clean: 'no'
+    scm_delete_on_update: 'no'
+    scm_type: git
+    scm_update_on_launch: 'no'
+    scm_url: '{{ this_demo_project_repo }}'
+    update_project: true
+
+controller_execution_environments:
+  - name: '{{ vcenter_ee }}'
+    image: quay.io/rh_ee_baddicks/vsphere-ee
+    credential: '{{ quay_cred }}'
+    pull: always
+  - name: '{{ rhel_ee }}'
+    image: quay.io/rh_ee_baddicks/rhel-90-ee
+    credential: '{{ quay_cred }}'
+    pull: always
+  - name: '{{ aap_ee }}'
+    image: quay.io/rh_ee_baddicks/ansible-controller-ee
+    credential: '{{ quay_cred }}'
+    pull: always
+  - name: '{{ windows_ee }}'
+    image: quay.io/rh_ee_baddicks/windows-ee
+    credential: Quay
+    pull: always
+
+controller_inventories:
+  - name: '{{ this_demo_inventory }}'
+    description: '{{ this_demo_inventory }}'
+    organization: Default
+
+controller_inventory_sources:
+  - name: '{{ this_demo_inventory }} Repo'
+    source: scm
+    inventory: '{{ this_demo_inventory }}'
+    source_path: inventory.yml
+    overwrite: true
+    update_on_launch: false
+    update_cache_timeout: 0
+    source_project: '{{ this_demo_project }}'
+
+controller_templates:
+  - name: 'Windows - OCP DNS'
+    job_type: run
+    inventory: '{{ this_demo_inventory }}'
+    project: '{{ this_demo_project }}'
+    playbook: 'playbooks/windows_ocp_dns.yml'
+    execution_environment: '{{ windows_ee }}'
+    credentials:
+      - '{{ ad_domain_cred }}'
